@@ -1,0 +1,62 @@
+---
+title: "machineLearning_courseProject"
+author: "Li Jiang"
+date: "Sunday, December 21, 2014"
+output: html_document
+---
+
+## Summary
+Large amount of data was collected from devices like Jawbone Up and Nike FuelBand about personal activies to monitor personal activity, regarding both what they do and whether do they do it right. The dataset to analyze consists of data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants to monitor whether they did the lifting correctly and what common mistakes they made. The collected data was used to predict which forms of lifting was performed. After removing redunant and unrelevant variables, I performed both random forest and booting on the training set and got about 0.95 accuracy by 5-fold cross validation for either of them, which corresponds to about 5% out of sample error. Then I used these 2 models to predict lifting activites on the testing set and got 18/20 correct, which corresponded to about 90% accuracy, slightly lower than the training set, but expected. 
+
+## Read in and clear the data
+First I read in the training and testing data and only keep variables with sufficient variation and remove variables with considerable amount of NA or blank values, as well as variables apparently not relevant to the prediction, like identity of the performers as well as when they performed the activites. After that, only 55 varialbes were kept and would be used for building prediction model. 
+```{r,echo=TRUE}
+## load data and library 
+data(mtcars)
+library(car)
+
+setwd("D:/R/R-3.1.2/wd/machineLearning/")
+library(caret)
+library(ggplot2)
+set.seed(123)
+training <- read.csv("D:/R/R-3.1.2/wd/machineLearning/pml-training.csv")
+testing <- read.csv("D:/R/R-3.1.2/wd/machineLearning/pml-testing.csv")
+noNA <- c(4,7,8,9,10,11,37,38,39,40,41,42,43,44,45,46,47,48,49,60,61,62,63,64,65,66,67,68,84,85,86,102,113,114,115,116,117,118,119,120,121,122,123,124,140,151,152,153,154,155,156,157,158,159,160)
+trainingSub <- training[ ,noNA]
+testingSub <- testing[ ,noNA]
+testingSub <- testingSub[ ,-length(noNA)]
+length(noNA)
+```
+## Sample the training set to make prediction model
+There are more than 19000 measurements, which significantly slowed down building the prediction model, which is true for both random Forest and Booting, so I randomly sampled 10% of the training data to build initial prediction model, which strongly accelerated the processing time.
+```{r,echo=TRUE}
+inTrain <- createDataPartition(trainingSub$classe,p=0.1,list=FALSE)
+trainingSubSample <- trainingSub[inTrain,]
+```
+
+## Model selection 
+Since the outcome to predict is a classification, rather than continous measurements, linear regression is not suitable. Since there are more than 2 options for the outcome, generalized linear prediction by binomial distribution is not applicable. As a result, I considered either random forest or booting, which are two most powerful prediction algorithms for classification prediction. I first tried random forest with 5-fold cross validation and got ~96% accucary, based on cross validation, which corresponsed to ~4% out of sample error. 
+```{r,echo=TRUE}
+control <- trainControl(method = "cv", number = 5)
+modFit2 <- train(classe~.,method="rf",data=trainingSubSample,trControl = control,prox=FALSE)
+pred2<-predict(modFit2,testingSub)
+modFit2
+```
+Then I tried booting with package "gbm" (booting with trees from caret package), also with 5-fold cross validation and got ~94% accuracy, which is very similar to the random forest prediction, with about 5% out of sample error. 
+```{r,echo=TRUE}
+modFit3 <- train(classe~.,method="gbm",data=trainingSubSample,trControl = control,verbose = FALSE)
+pred3<-predict(modFit3,testingSub)
+modFit3
+```
+The out of sample error suggests that random forest and booting have equally good performance, and hopefully no strong overfitting, so I decide that either model is OK 
+```{r,echo=TRUE}
+pred2
+pred3
+identical(pred2,pred3)
+```
+
+## Check on test set
+I performed a one time check on the test set and got the same result from both random forest and booting. 18/20 was correct, corresponding to a 90% accuracy, slightly worse than the 95% of training set, but still good. It indicated that I don't have strong overfitting or underfitting. The 2 approaches shared the same mistakes (the 8th and 16th of the training set), probably indicating some trace of systematic bias. 
+
+## Conclusion
+Both random forest and booting have around 95% accuracy in the training set (5% out of sample error) and 90% of test set, indicating equally strong predictive power of these 2 approaches, in predicting human activity from different activity parameters.
